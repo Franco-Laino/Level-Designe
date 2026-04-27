@@ -1,58 +1,48 @@
 using UnityEngine;
-using UnityEngine.AI;
 
+// Hereda de EnemyBase
 public class BichoNegroAI : EnemyBase
 {
+	private Rigidbody rb;  // Rigidbody para mover con físicas
 
-    NavMeshAgent agent;  // declaramos el NavMeshAgent para el enemigo.
-    Rigidbody rb;  // declaramos el rigidbody.
+	[SerializeField] private float normalSpeed = 3.5f; // Velocidad acechando
+	[SerializeField] private float fastSpeed = 6f;     // Velocidad persiguiendo
 
-    [SerializeField] private float normalSpeed = 3.5f;  // Velocidad acechando.
-	[SerializeField] private float fastSpeed = 6.0f;  // Velocidad persiguiendo al prota.
+	[SerializeField] private bool isRepelled = false;  // ¿Está siendo repelido?
+	[SerializeField] private float repelTimer = 0f;    // Tiempo de repel
 
-	[SerializeField] private bool isRepelled = false;  // ¿El chobi esta siendo repelido?
-	[SerializeField] private float repelTimer = 0f;  // Tiempo de repelion.
+	[SerializeField] private float stateTimer = 0f;    // Cambio de comportamiento
 
-	[SerializeField] private float stateTimer = 0f;  // Tiempo para cambiar el comportamiento del chobi.
+	private float currentSpeed; // Velocidad actual usada
 
-
-	
-
-	// Start is called once before the first execution of Update after the MonoBehaviour is created
 	void Start()
-    {
-        
-        agent = GetComponent<NavMeshAgent>();
-        rb = GetComponent<Rigidbody>();
+	{
+		rb = GetComponent<Rigidbody>();
 
-        rb.isKinematic = true;  // Esto evita quilombos con el NavMesh.
+		// Configuración recomendada del rigidbody
+		rb.freezeRotation = true;  // Evita que se vuelque
+		currentSpeed = normalSpeed;
+	}
 
-        agent.speed = normalSpeed;  // Velocidad inicial.
-    }
-    
-    // Update is called once per frame
-    void Update()
-    {
-        
-        
-
-        
-        if (IsInSafeZone())  // Si está en la zona segura no te hace nada.
-        {
-            agent.ResetPath();
-            return;
-        }
-
-        HandleRepel(); // Maneja el estado del repel.
-        HandleMovement(); // decide si te esta persiguiendo o acechando.
-
-    }
-
-    public void HandleRepel()
-    {
-		if (isRepelled)  // ¿Esta siendo repelido por la linterna?
+	void FixedUpdate() // usamos FixedUpdate porque usamos físicas
+	{
+		// Si está en zona segura → no se mueve
+		if (IsInSafeZone())
 		{
-			repelTimer -= Time.deltaTime;
+			rb.linearVelocity = new Vector3(0, rb.linearVelocity.y, 0);
+			return;
+		}
+
+		HandleRepel();      // Maneja el estado de repel
+		HandleMovement();   // Decide cómo se mueve
+	}
+
+	// Manejo del repel (linterna)
+	public void HandleRepel()
+	{
+		if (isRepelled)
+		{
+			repelTimer -= Time.fixedDeltaTime;
 
 			if (repelTimer <= 0)
 			{
@@ -61,52 +51,56 @@ public class BichoNegroAI : EnemyBase
 		}
 	}
 
-    public void HandleMovement()
-    {
-        if (isRepelled) return;  // Si esta repelido, no persigue.
-        
-        stateTimer -= Time.deltaTime;
-
-        if(stateTimer <= 0)  // Cada cierto tiempo cambia comportamiento.
-        {
-            stateTimer = Random.Range(2f, 5f);
-
-			if (Random.value > 0.5f)    // Decide aleatoriamente si acecha o persigue.
-			{
-                agent.speed = fastSpeed;    // Modo persecucion, va rapido directo al prota.
-                agent.SetDestination(GetPlayer().position);
-			} else
-            {
-                agent.speed = normalSpeed;  // Modo acecho, va mas lento,
-
-                Vector3 dir = (GetPlayer().position - transform.position).normalized;    // Posicion cercana al prota (no encima)
-                Vector3 stalkPos = GetPlayer().position - dir * 3f;
-
-                agent.SetDestination(stalkPos);
-            }
-		}
-    }
-
-    public override void Repel (Vector3 from)  // Llamado de la linterna.
-    {
-        isRepelled = true;
-        repelTimer = 2f;
-
-        Vector3 dir = (transform.position - from).normalized;   // Calcula la direccion opuesta al prota.
-
-        Vector3 target = transform.position + dir * 5f; // Se mueve hacia atras.
-
-        agent.SetDestination(target);
-    }
-
-	public void OnCollisionEnter(Collision collision)   // Daño al prota al tocarlo.
+	// Movimiento general
+	public void HandleMovement()
 	{
-        if (collision.gameObject.CompareTag("Prota"))
-        {
-            collision.gameObject.GetComponent<ProtaHealth>().TakeDamage();
+		// Si está repelido no persigue
+		if (isRepelled) return;
 
+		stateTimer -= Time.fixedDeltaTime;
+
+		// Cambia comportamiento cada cierto tiempo
+		if (stateTimer <= 0)
+		{
+			stateTimer = Random.Range(2f, 5f);
+
+			// Decide si va rápido o lento
+			if (Random.value > 0.5f)
+			{
+				currentSpeed = fastSpeed; // persecución
+			}
+			else
+			{
+				currentSpeed = normalSpeed; // acecho
+			}
 		}
+
+		// Dirección hacia el jugador
+		Vector3 dir = (GetPlayer().position - transform.position).normalized;
+
+		// Movimiento con física (manteniendo gravedad)
+		rb.linearVelocity = new Vector3(dir.x * currentSpeed, rb.linearVelocity.y, dir.z * currentSpeed);
 	}
 
+	// Repel con linterna
+	public override void Repel(Vector3 from)
+	{
+		isRepelled = true;
+		repelTimer = 2f;
 
+		// Dirección opuesta a la linterna
+		Vector3 dir = (transform.position - from).normalized;
+
+		// Se impulsa hacia atrás
+		rb.linearVelocity = new Vector3(dir.x * fastSpeed, rb.linearVelocity.y, dir.z * fastSpeed);
+	}
+
+	// Daño al jugador
+	private void OnCollisionEnter(Collision collision)
+	{
+		if (collision.gameObject.CompareTag("Prota"))
+		{
+			collision.gameObject.GetComponent<ProtaHealth>().TakeDamage();
+		}
+	}
 }

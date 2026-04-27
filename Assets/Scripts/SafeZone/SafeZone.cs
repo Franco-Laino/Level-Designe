@@ -1,63 +1,62 @@
-using NUnit.Framework;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.AI;
 
 public class SafeZone : MonoBehaviour
 {
-
-	private static List<SafeZone> allSafeZones = new List<SafeZone>();	// Lista global de todas las zonas seguras.
+	// Lista global de todas las zonas seguras (para respawn, etc.)
+	public static List<SafeZone> allSafeZones = new List<SafeZone>();
 
 	private void Awake()
 	{
-		allSafeZones.Add(this);	// Se agrega a la lista al iniciar.
+		// Se agrega a la lista al iniciar
+		allSafeZones.Add(this);
 	}
 
 	private void OnDestroy()
 	{
+		// Se elimina si se destruye
 		allSafeZones.Remove(this);
 	}
 
+	// Cuando un enemigo entra a la zona segura
 	private void OnTriggerEnter(Collider other)
 	{
 		if (other.CompareTag("Enemy"))
 		{
-			EnemyBase enemy = other.GetComponent<EnemyBase>();  // Script del enemigo.
+			EnemyBase enemy = other.GetComponent<EnemyBase>();
 
-			if (enemy != null )	
+			if (enemy != null)
 			{
-				enemy.SetSafeZone(true);	// Esto hace que deje de perseguir al prota.
+				// Indica que está en zona segura (deja de perseguir)
+				enemy.SetSafeZone(true);
 
-				Vector3 dir = (other.transform.position - enemy.GetPlayer().position).normalized;  // Calcula la direccion contraria al prota.
-				
-				Vector3 escapePos = other.transform.position + dir * 5f;  // Posicion de escape.
+				// Calcula dirección contraria al jugador
+				Vector3 dir = (other.transform.position - enemy.GetPlayer().position).normalized;
 
-				NavMeshAgent agent = other.GetComponent<NavMeshAgent>();
+				// Aplica fuerza o velocidad para que se aleje
+				Rigidbody rb = other.GetComponent<Rigidbody>();
 
-				if (agent != null )
+				if (rb != null)
 				{
-					agent.isStopped = false;	// Asegura que se mueva.
-
-					agent.SetDestination(escapePos);  // Se aleja de la zona segura;
+					// Mantiene la velocidad vertical (gravedad)
+					rb.linearVelocity = new Vector3(dir.x * 5f, rb.linearVelocity.y, dir.z * 5f);
 				}
 			}
 		}
 	}
 
-
+	// Cuando el enemigo sale de la zona segura
 	private void OnTriggerExit(Collider other)
 	{
-		if(other.CompareTag("Enemy"))
+		if (other.CompareTag("Enemy"))
 		{
 			EnemyBase enemy = other.GetComponent<EnemyBase>();
 
-
 			if (enemy != null)
 			{
-				enemy.SetSafeZone(false);  // Puede volver a perseguir al prota.
+				// Vuelve a comportamiento normal
+				enemy.SetSafeZone(false);
 			}
 		}
 	}
-
-
 }
