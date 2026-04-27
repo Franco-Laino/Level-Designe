@@ -6493,8 +6493,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BichoNegroAI
   player: {fileID: 811111573}
-  normalSpeed: 3
-  fastSpeed: 4
+  normalSpeed: 1.5
+  fastSpeed: 2
   isRepelled: 0
   repelTimer: 0
   stateTimer: 0
